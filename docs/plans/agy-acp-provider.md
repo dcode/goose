@@ -1,6 +1,6 @@
 # Plan: `agy-acp` provider (Antigravity CLI over ACP)
 
-Status: **design settled; ready to implement Phase 1.** One open item (MCP passthrough) only affects a flag and a test toggle.
+Status: **Phase 0 (probe) complete; design final; ready to implement Phase 1.**
 Branch: `claude/elegant-johnson-lwx4rh`. Last updated 2026-11-08.
 
 > Working doc for picking this back up after a break. Drop it from the branch (or
@@ -55,8 +55,14 @@ Raw transcript: run `docs/plans/agy_probe.py`. Summary:
   - `id: "mode"`, category `mode`: same values as the modes above.
 - **Legacy `models`** (`session/set_model`): model × effort combos, e.g. `gemini-4-argon-high`. Ignore; use the config options.
 - **`_meta.antigravity.tier`** on `session/new`: `{name: "Google AI Pro", id: "g1-pro-tier", upgradeUri}`. The model list likely varies by tier.
-- **`session/new` with a stdio `mcpServers` entry is accepted** (no error). Whether its tools reach the model is untested:
-  the 2nd probe prompted the *non-MCP* session by mistake (probe bug, fixed).
+- **MCP passthrough works.** A stdio `mcpServers` entry (`server-everything`) shows up as tools for the model,
+  with or without extra flags.
+- **HTTP MCP needs `--process-per-session`.** Only with that flag does `initialize` advertise
+  `mcpCapabilities: {http: true}`. goose's `filter_supported_servers` (`provider.rs` ~L1921) drops `McpServer::Http`
+  entries when `http` is false, so without the flag goose's StreamableHttp extensions would be silently dropped.
+- **Usage split:** `inputTokens` excludes cache hits (2nd run: `inputTokens 2051`, `cachedReadTokens 15230`,
+  `totalTokens 17659`). goose maps only input/output/total, so input looks tiny while total is right.
+  That's a shared ACP-client issue, not agy-specific.
 - **`session/prompt` result includes `usage`** (`inputTokens`, `outputTokens`, `cachedReadTokens`, `cachedWriteTokens`,
   `thoughtTokens`, `totalTokens`). Check goose maps it into its token accounting.
 - Extra notifications goose must tolerate: `available_commands_update` (~70 slash commands/skills: `/goal`, `/compact`,
@@ -69,7 +75,7 @@ Raw transcript: run `docs/plans/agy_probe.py`. Summary:
 
 ## Design (decided)
 
-- Provider id `agy-acp`, display name "Antigravity CLI (ACP)", binary `agy`, args `["acp"]`.
+- Provider id `agy-acp`, display name "Antigravity CLI (ACP)", binary `agy`, args `["acp", "--process-per-session"]`.
   Aliases `["agy-acp", "agy", "antigravity"]`.
 - **Model:** copy `copilot_acp.rs` — `configured_model_for_provider`, `session_config_options = [("model", m)]` unless `current`,
   `model_config_option_id = Some("model")`, plus `from_env_with_default_model`. Base model ids (`gemini-4-argon`), not the legacy suffixed ones.
@@ -92,25 +98,20 @@ Raw transcript: run `docs/plans/agy_probe.py`. Summary:
 - **Inventory:** `acp_inventory(AGY_ACP_PROVIDER_NAME, AGY_ACP_BINARY, true)` (model refresh supported).
 - **Setup metadata:** `cli_agent("agy", aliases).with_acp().with_docs_url("https://antigravity.google/docs/cli/acp/")`,
   `.show_only_when_installed()` for v1, so users without `agy` don't see it. Capabilities stay off.
-- **MCP:** pass `extension_configs_to_mcp_servers(&extensions)` as usual. Whether `--process-per-session` is needed is still open (see below).
+- **MCP:** pass `extension_configs_to_mcp_servers(&extensions)` as usual, and launch with **`args = ["acp", "--process-per-session"]`** so HTTP extensions are accepted. Cheap: goose already runs one agy process per goose session (`SESSION_BOUND`).
 
 ## Open questions
 
-1. **MCP passthrough.** Does agy honor stdio `mcpServers` in `session/new`? Does it need `--process-per-session` for HTTP ones
-   (goose maps `StreamableHttp` extensions to `McpServer::Http`)?
-   Run both (second only if the first shows no `probe` tools):
-   `python3 docs/plans/agy_probe.py --mcp-cmd "npx -y @modelcontextprotocol/server-everything" --prompt`
-   `python3 docs/plans/agy_probe.py --agy-arg=--process-per-session --mcp-cmd "npx -y @modelcontextprotocol/server-everything" --prompt` Outcome decides `--process-per-session` and `.test_mcp_tools(...)`.
-2. **`user_message_chunk` echo / `usage` mapping** — check `provider.rs` handling while implementing.
-3. **`resolve_mode` with two goose modes on `accept-edits`.** Confirm while writing the unit test.
-4. **ToS.** `agy acp` is Google's documented surface for third-party editors; mention it in the upstream issue.
+1. **`user_message_chunk` echo:** agy echoes the prompt back. Confirm goose ignores it rather than rendering it twice.
+2. **`resolve_mode` with two goose modes on `accept-edits`:** confirm in the unit test.
+3. **ToS:** `agy acp` is Google's documented way for third-party editors to connect; mention it in the upstream issue.
 
 ## Roadmap / TODO
 
 ### Phase 0 — Probe the real server
 - [x] Install `agy`, `agy acp --login`.
 - [x] `initialize` + `session/new` captured; auth, modes, models and thinking settled (see Probe results).
-- [ ] MCP + prompt probe (Open question 1).
+- [x] MCP + prompt probe: stdio works; HTTP needs `--process-per-session`.
 
 ### Phase 1 — Provider
 - [ ] `crates/goose/src/providers/agy_acp.rs` (consts `AGY_ACP_PROVIDER_NAME`, `AGY_ACP_BINARY`, metadata, `create()`, mode mapping).
@@ -121,7 +122,7 @@ Raw transcript: run `docs/plans/agy_probe.py`. Summary:
 ### Phase 2 — Tests
 - [ ] Unit test: mode mapping round-trips (incl. the two-to-one `accept-edits` case).
 - [ ] `test_agy_acp_provider` in `tests/providers.rs` (`// Requires: agy installed + agy acp --login`):
-      `.model_switch_name("gemini-3.8-flash")`, `.test_thinking_effort(true)`, `.test_mcp_tools(...)` per Phase 0.
+      `.model_switch_name("gemini-3.8-flash")`, `.test_thinking_effort(true)`, `.test_mcp_tools(true)`.
 - [ ] Skip adding to `acp_custom_provider_methods_test.rs` while `show_only_when_installed` (CI has no `agy`).
 
 ### Phase 3 — Docs
@@ -138,4 +139,5 @@ Raw transcript: run `docs/plans/agy_probe.py`. Summary:
 - Desktop setup auth action running `agy acp --login` (or declare `auth.terminal` in goose's ACP client generically).
 - Pass `--agent <name>` / `--add-dir` via provider config.
 - Use `_meta.antigravity.systemPrompt.append` to pass goose's system prompt / hints.
+- ACP client: map `cachedReadTokens`/`cachedWriteTokens` into goose `Usage` (affects all ACP providers).
 - Surface `_meta.antigravity.tier` (e.g. in provider status) and ACP `logout` in the setup UI.

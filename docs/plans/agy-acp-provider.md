@@ -134,6 +134,8 @@ All resolved:
 - [ ] `cargo fmt`, `cargo clippy --all-targets -- -D warnings`, `GOOSE_DISABLE_KEYRING=1 cargo test -p goose`.
 - [ ] Manual: `GOOSE_PROVIDER=agy-acp goose session` in each goose mode; model switch; thinking switch; one MCP extension.
 - [ ] Desktop: provider shows in setup catalog when `agy` is installed; model and thinking pickers work.
+- [ ] Manual test on Intel macOS 15 using the CLI artifact from `.github/workflows/agy-test-build.yml` (temporary; runs on every push to this branch).
+- [ ] Before an upstream PR: delete `.github/workflows/agy-test-build.yml`, `docs/plans/` (move notes into the issue).
 - [ ] Open upstream issue from `.github/ISSUE_TEMPLATE/` (Feature); wait for **Ready** before an upstream PR.
 
 ## Follow-ups (out of scope for v1)

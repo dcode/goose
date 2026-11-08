@@ -1,0 +1,67 @@
+# TEMPORARY: Intel macOS build of the goose CLI from this branch, for manually testing the
+# agy-acp provider. Drop this file before opening an upstream PR.
+name: "agy test build (macOS Intel CLI)"
+
+on:
+  push:
+    branches:
+      - claude/elegant-johnson-lwx4rh
+    paths-ignore:
+      - "documentation/**"
+      - "docs/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: goose CLI (x86_64-apple-darwin)
+    runs-on: macos-15-intel
+    env:
+      # Same as the release build (bundle-macos.yml).
+      MACOSX_DEPLOYMENT_TARGET: "12.0"
+      TARGET: x86_64-apple-darwin
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6  # v2.9.2
+        with:
+          key: agy-test-intel-macos
+
+      - name: Build goose CLI
+        run: |
+          source ./bin/activate-hermit
+          rustup target add "$TARGET"
+          cargo build --release -p goose-cli --bin goose --target "$TARGET"
+
+      - name: Verify the binary links only system libraries
+        run: |
+          bin="target/${TARGET}/release/goose"
+          vtool -show-build "$bin"
+          otool -L "$bin"
+          if otool -L "$bin" | tail -n +2 | grep -vE '^\s*(/usr/lib/|/System/Library/)'; then
+            echo "::error::binary links non-system libraries (would not run on a clean Mac)"
+            exit 1
+          fi
+          "$bin" --version
+
+      - name: Package
+        run: |
+          mkdir -p dist
+          cp "target/${TARGET}/release/goose" dist/goose
+          tar -C dist -czf "goose-${TARGET}.tar.gz" goose
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: goose-agy-acp-${{ env.TARGET }}
+          path: goose-${{ env.TARGET }}.tar.gz
+          if-no-files-found: error
+          retention-days: 14

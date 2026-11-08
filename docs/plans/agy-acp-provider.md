@@ -45,7 +45,23 @@ lives in `crates/goose/src/acp/provider.rs`.
 - Logs: `~/.gemini/antigravity-cli/log/acp-*.log`.
 - Supports session load/resume/list/close; resume doesn't replay history.
 
+## Probe results so far (agy 1.5.3, 2026-11-08)
+
+- `initialize` → `agentInfo: Antigravity ACP Server 1.5.3`, protocol 1. `loadSession`, session `resume/close/load/list/additionalDirectories`,
+  `auth.logout`, prompt images + embedded context. `_meta.antigravity.systemPrompt.append = true` (could carry goose's system prompt later).
+- `authMethods`: `oauth-personal`, `oauth-business`, `gemini-api-key`, `agent-platform`, and
+  `terminal-login` (`type: "terminal"`, `args: ["--login"]`) — i.e. ACP terminal-auth: client re-runs the agent binary with `--login`.
+  This is exactly what the setup UI's "auth" capability should invoke.
+- `agy acp --help` confirms the flag list; also `--stdio` (default), `--include-default-customizations` (default true),
+  `--app-data-dir`/`--gemini-dir`/`--cli_dir_name` (useful for test isolation), and `--log-file`.
+- `session/new` returned `-32000 Authentication required` **even after `agy acp --login` succeeded** — but that run was a
+  separate process with no `initialize` first, so inconclusive. **goose's ACP client never calls `authenticate`**, so if agy
+  needs an explicit `authenticate(oauth-personal)` even with cached creds, the shared client needs an opt-in hook
+  (e.g. `AcpProviderConfig::authenticate_method: Option<String>`). `docs/plans/agy_probe.py` answers this.
+
 ## Open questions (resolve with a live probe — Phase 0)
+
+0. **Does `session/new` succeed after `initialize` alone with cached creds, or is `authenticate` required?** (run `agy_probe.py`)
 
 1. **Mode ids** — does `session/new` return `modes.availableModes`? If yes, which ids (`auto`/`plan`/`default`/`accept-edits`?).
 2. **Config option ids** — exact `configOptions[].id` for model and thinking level (`model`? `thinking_level`?).
@@ -75,9 +91,10 @@ lives in `crates/goose/src/acp/provider.rs`.
 ## Roadmap / TODO
 
 ### Phase 0 — Probe the real server
-- [ ] Install `agy` (needs network access to `antigravity.google`; this cloud container doesn't have it yet).
-- [ ] `agy acp --login`, then script a raw JSON-RPC session: `initialize` → `session/new` (with one stdio + one HTTP MCP server) → `session/prompt`.
-      Record `agentCapabilities`, `authMethods`, `modes`, `configOptions` into `docs/plans/agy-acp-probe.json`.
+- [x] Install `agy` and `agy acp --login` (done on Derek's machine).
+- [x] `initialize` response captured (see Probe results).
+- [ ] Run `python3 docs/plans/agy_probe.py --mcp-cmd "npx -y @modelcontextprotocol/server-everything" --prompt`
+      and commit `docs/plans/agy-acp-probe.json` (check it for anything sensitive first).
 - [ ] Answer open questions 1–5 above and update the Design section.
 
 ### Phase 1 — Provider
@@ -106,4 +123,6 @@ lives in `crates/goose/src/acp/provider.rs`.
 ## Follow-ups (out of scope for v1)
 - Thinking-level picker wired to goose thinking effort (if not done in Phase 1).
 - Pass `--agent <name>` / `--add-dir` via provider config fields.
+- Use `_meta.antigravity.systemPrompt.append` to pass goose's system prompt / hints.
+- Support ACP `logout` from the setup UI.
 - Setup-UI install/login actions (`with_capabilities(true, true, true)`) using `install.sh` and `agy acp --login`.

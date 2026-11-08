@@ -150,8 +150,14 @@ All resolved:
       Note: goose's builtin/platform extensions (developer, memory, todo, …) are not passed to agy, so the model only
       sees agy's own tools plus stdio/HTTP extensions. Expected for ACP providers; mention in docs if users ask.
 - [ ] Run workspace-wide `cargo clippy --all-targets -- -D warnings` (only `-p goose` done) and `test_agy_acp_provider` on a machine with `agy`.
-- [ ] Manual: remaining goose modes (SmartApprove, Approve — confirm permission prompts render; Chat → `plan`); model switch; thinking switch. (Auto + MCP done.)
+- [ ] Manual: remaining goose modes (SmartApprove, Approve — confirm permission prompts render; Chat → `plan`);
+      model and thinking via a fresh session (`GOOSE_MODEL=… GOOSE_THINKING_EFFORT=high`). (Auto + MCP done.)
+      The CLI refuses mid-session `/model` for every `*-acp` provider (`goose-cli/src/session/mod.rs` ~L953, upstream
+      behaviour, not ours); mid-session switching is a desktop-only check.
 - [ ] Desktop: provider shows in setup catalog when `agy` is installed; model and thinking pickers work.
+      The installed Goose.app bundles its own upstream `goose` (no agy-acp) and packaged builds reject `GOOSE_BINARY`.
+      Test via the dev UI from this branch: `cd ui/desktop && pnpm install && GOOSE_BINARY=<CI goose> pnpm run start-gui`
+      (`findGooseBinaryPath` in `ui/desktop/src/gooseServe.ts` honours `GOOSE_BINARY` when unpackaged).
 - [ ] Manual test on Intel macOS 15 using the CLI artifact from `.github/workflows/agy-test-build.yml` (temporary; runs on every push to this branch).
 - [ ] Before an upstream PR: delete `.github/workflows/agy-test-build.yml`, `docs/plans/` (move notes into the issue).
 - [ ] Open upstream issue from `.github/ISSUE_TEMPLATE/` (Feature); wait for **Ready** before an upstream PR.

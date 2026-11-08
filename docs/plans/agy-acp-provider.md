@@ -1,6 +1,6 @@
 # Plan: `agy-acp` provider (Antigravity CLI over ACP)
 
-Status: **Phases 1–3 done and verified in CI-less container; next: manual test on Intel macOS 15 (Phase 4).**
+Status: **Phases 1–3 done. First Mac run failed on MCP tool names (fixed, see Probe results); next: re-test the new macOS build (Phase 4).**
 Branch: `claude/elegant-johnson-lwx4rh`. Last updated 2026-11-08.
 
 > Working doc for picking this back up after a break. Drop it from the branch (or
@@ -60,6 +60,13 @@ Raw transcript: run `docs/plans/agy_probe.py`. Summary:
 - **HTTP MCP needs `--process-per-session`.** Only with that flag does `initialize` advertise
   `mcpCapabilities: {http: true}`. goose's `filter_supported_servers` (`provider.rs` ~L1921) drops `McpServer::Http`
   entries when `http` is false, so without the flag goose's StreamableHttp extensions would be silently dropped.
+- **MCP server names must be tool-name safe.** agy names tools `mcp_<server>_<tool>`, logs (but still sends) names
+  violating `^[a-zA-Z0-9_-]{1,64}$`, and Gemini then 400s every turn (`Invalid function name`), which goose shows as
+  agy's own "⚠ Agent execution terminated due to error." Found with the extension "Chrome DevTools" on the first Mac run.
+  The provider now maps non-`[A-Za-z0-9_-]` chars in server names to `_` (`agy_mcp_servers`). The 64-char limit is not
+  enforced (Gemini allows 128); revisit if a long server+tool name breaks.
+- Logs: `~/.gemini/antigravity-cli/log/acp-front-*.log` (front process) and `acp-worker-*.log` (per-session worker,
+  has the real errors).
 - **Usage split:** `inputTokens` excludes cache hits (2nd run: `inputTokens 2051`, `cachedReadTokens 15230`,
   `totalTokens 17659`). goose maps only input/output/total, so input looks tiny while total is right.
   That's a shared ACP-client issue, not agy-specific.
@@ -137,6 +144,8 @@ All resolved:
       `gcpauth` race test (container proxy), `test_app_tool_call_applies_extension_mutation`, `test_claude_code_provider`
       (live e2e against the container's own `claude` CLI), one flaky ACP retry test.
       Tip: in a small container use `CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0` or integration tests run out of disk.
+- [x] First Mac run (2026-11-08): every turn failed; root cause MCP server name with a space → fixed by sanitizing names.
+- [ ] Re-test on Mac with the new build (same extensions, incl. "Chrome DevTools").
 - [ ] Run workspace-wide `cargo clippy --all-targets -- -D warnings` (only `-p goose` done) and `test_agy_acp_provider` on a machine with `agy`.
 - [ ] Manual: `GOOSE_PROVIDER=agy-acp goose session` in each goose mode; model switch; thinking switch; one MCP extension.
 - [ ] Desktop: provider shows in setup catalog when `agy` is installed; model and thinking pickers work.
@@ -145,6 +154,9 @@ All resolved:
 - [ ] Open upstream issue from `.github/ISSUE_TEMPLATE/` (Feature); wait for **Ready** before an upstream PR.
 
 ## Follow-ups (out of scope for v1)
+- goose shows agy's turn failure with no reason; the real error is only in agy's worker log. Consider surfacing
+  agy's stop reason / error text, or pointing at the log in the docs troubleshooting section.
+- Report upstream to agy: invalid tool names are logged but still sent to the model.
 - Desktop setup auth action running `agy acp --login` (or declare `auth.terminal` in goose's ACP client generically).
 - Pass `--agent <name>` / `--add-dir` via provider config.
 - Use `_meta.antigravity.systemPrompt.append` to pass goose's system prompt / hints.

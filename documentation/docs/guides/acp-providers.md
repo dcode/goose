@@ -288,7 +288,7 @@ Antigravity reports its available models dynamically, and the list depends on yo
 
 goose starts `agy acp` with `--process-per-session`, which Antigravity requires before it accepts streamable HTTP extensions.
 
-Antigravity also supports a Gemini API key (`GEMINI_API_KEY`) or Vertex AI Application Default Credentials (`AGY_ADC_AUTH=true`); see the [Antigravity ACP docs](https://antigravity.google/docs/cli/acp/). Logs are written to `~/.gemini/antigravity-cli/log/acp-*.log`.
+Antigravity also supports a Gemini API key (`GEMINI_API_KEY`) or Vertex AI Application Default Credentials (`AGY_ADC_AUTH=true`); see the [Antigravity ACP docs](https://antigravity.google/docs/cli/acp/). Logs are written to `~/.gemini/antigravity-cli/log/`; if a turn ends with "Agent execution terminated due to error", the cause is in the newest `acp-worker-*.log`.
 
 ### Claude ACP Configuration
 

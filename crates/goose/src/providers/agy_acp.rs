@@ -1,3 +1,4 @@
+use agent_client_protocol::schema::v1::McpServer;
 use anyhow::Result;
 use futures::future::BoxFuture;
 use std::collections::HashMap;
@@ -74,6 +75,38 @@ fn session_config_options(model: String) -> Vec<(String, String)> {
     }
 }
 
+/// agy names MCP tools `mcp_<server>_<tool>` and requires `^[a-zA-Z0-9_-]{1,64}$`, yet still
+/// forwards invalid names to the model, whose API then rejects every turn with a 400.
+/// goose extension names like "Chrome DevTools" or "plugin:server" are common.
+fn tool_safe_server_name(name: &str) -> String {
+    name.chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '_' || c == '-' {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect()
+}
+
+fn agy_mcp_servers(extensions: &[crate::config::ExtensionConfig]) -> Vec<McpServer> {
+    extension_configs_to_mcp_servers(extensions)
+        .into_iter()
+        .map(|server| match server {
+            McpServer::Stdio(mut s) => {
+                s.name = tool_safe_server_name(&s.name);
+                McpServer::Stdio(s)
+            }
+            McpServer::Http(mut s) => {
+                s.name = tool_safe_server_name(&s.name);
+                McpServer::Http(s)
+            }
+            other => other,
+        })
+        .collect()
+}
+
 impl AgyAcpProvider {
     fn create(
         extensions: Vec<crate::config::ExtensionConfig>,
@@ -97,7 +130,7 @@ impl AgyAcpProvider {
                 env: vec![],
                 env_remove: vec![],
                 work_dir: working_dir,
-                mcp_servers: extension_configs_to_mcp_servers(&extensions),
+                mcp_servers: agy_mcp_servers(&extensions),
                 session_mode_id: mode_mapping[&goose_mode].first().cloned(),
                 session_config_options: session_config_options(model),
                 model_config_option_id: Some(MODEL_CONFIG_OPTION_ID.to_string()),
@@ -150,6 +183,13 @@ mod tests {
     #[test_case(GooseMode::Chat, MODE_PLAN)]
     fn maps_every_goose_mode_to_an_agy_mode(goose_mode: GooseMode, agy_mode: &str) {
         assert_eq!(mode_mapping()[&goose_mode], vec![agy_mode.to_string()]);
+    }
+
+    #[test_case("Chrome DevTools", "Chrome_DevTools")]
+    #[test_case("rpi-ctags:ctags", "rpi-ctags_ctags")]
+    #[test_case("developer", "developer")]
+    fn sanitizes_mcp_server_names_for_tool_names(name: &str, expected: &str) {
+        assert_eq!(tool_safe_server_name(name), expected);
     }
 
     #[test]

@@ -956,6 +956,16 @@ async fn test_claude_acp_provider() -> Result<()> {
         .await
 }
 
+// Requires: agy installed (https://antigravity.google/docs/cli/acp/) and `agy acp --login`
+#[tokio::test]
+async fn test_agy_acp_provider() -> Result<()> {
+    ProviderTestConfig::with_agentic_provider("agy-acp", ACP_CURRENT_MODEL, "agy")
+        .model_switch_name("gemini-3.8-flash")
+        .test_thinking_effort(true)
+        .run()
+        .await
+}
+
 // Requires: npm install -g @github/copilot
 #[tokio::test]
 async fn test_copilot_acp_provider() -> Result<()> {

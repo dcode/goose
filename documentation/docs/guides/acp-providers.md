@@ -32,6 +32,14 @@ Wraps [amp-acp](https://www.npmjs.com/package/amp-acp), an ACP adapter for [Amp]
 - ACP adapter installed (`npm install -g amp-acp`)
 - Authenticated with your Amp account (`amp` CLI working)
 
+### Antigravity CLI ACP
+
+Runs `agy acp`, the ACP server built into Google's [Antigravity CLI](https://antigravity.google/docs/cli/acp/). Uses your existing Google AI subscription (or a Gemini API key or Vertex AI credentials). No separate adapter is needed.
+
+**Requirements:**
+- Antigravity CLI (`agy`) v1.5 or later installed
+- Authenticated with your Google account (`agy acp --login`)
+
 ### Claude ACP
 
 Wraps [claude-agent-acp](https://github.com/agentclientprotocol/claude-agent-acp), an ACP adapter for Anthropic's Claude Code. Uses the same Claude subscription as the deprecated `claude-code` CLI provider.
@@ -84,6 +92,33 @@ Wraps `pi-acp`, an ACP adapter for Pi. Uses your existing Pi installation.
    Set the provider environment variable:
    ```bash
    export GOOSE_PROVIDER=amp-acp
+   ```
+
+   Or configure through the goose CLI using `goose configure`.
+
+### Antigravity CLI ACP
+
+1. **Install the Antigravity CLI**
+
+   ```bash
+   curl -fsSL https://antigravity.google/cli/install.sh | bash
+   ```
+
+   This installs `agy` to `~/.local/bin`, which goose searches even if it isn't on your `PATH`.
+
+2. **Authenticate**
+
+   ```bash
+   agy acp --login
+   ```
+
+   Open the printed link, sign in with Google, and paste the code back into the terminal. This also works over SSH.
+
+3. **Configure goose**
+
+   Set the provider environment variable:
+   ```bash
+   export GOOSE_PROVIDER=agy-acp
    ```
 
    Or configure through the goose CLI using `goose configure`.
@@ -232,6 +267,29 @@ GOOSE_PROVIDER=codex-acp goose run \
 | `GOOSE_MODEL`        | Model to use      | `current` |
 | `GOOSE_MODE`         | Permission mode   | `auto`    |
 
+### Antigravity CLI ACP Configuration
+
+| Environment Variable | Description      | Default   |
+|----------------------|------------------|-----------|
+| `GOOSE_PROVIDER`     | Set to `agy-acp` | None      |
+| `GOOSE_MODEL`        | Model to use     | `current` |
+| `GOOSE_MODE`         | Permission mode  | `auto`    |
+
+Antigravity reports its available models dynamically, and the list depends on your subscription tier. Keep `current` to use Antigravity's default (for example `gemini-4-argon`), or pick a model such as `gemini-3.8-flash`. The thinking level (`low`, `medium`, `high`) follows goose's thinking-effort setting.
+
+**Permission Modes (`GOOSE_MODE`):**
+
+| goose mode      | Antigravity mode | Behavior                                                         |
+|-----------------|------------------|------------------------------------------------------------------|
+| `auto`          | `accept-edits`   | Edits are accepted by Antigravity; goose approves other requests |
+| `smart-approve` | `accept-edits`   | Auto-accepts file edits, prompts for commands                    |
+| `approve`       | `default`        | Prompts before edits and commands                                |
+| `chat`          | `plan`           | Plans before executing                                           |
+
+goose starts `agy acp` with `--process-per-session`, which Antigravity requires before it accepts streamable HTTP extensions.
+
+Antigravity also supports a Gemini API key (`GEMINI_API_KEY`) or Vertex AI Application Default Credentials (`AGY_ADC_AUTH=true`); see the [Antigravity ACP docs](https://antigravity.google/docs/cli/acp/). Logs are written to `~/.gemini/antigravity-cli/log/acp-*.log`.
+
 ### Claude ACP Configuration
 
 | Environment Variable | Description         | Default   |
@@ -289,7 +347,7 @@ See [codex-acp](https://github.com/agentclientprotocol/codex-acp) for session mo
 
 ACP providers depend on external binaries, so ensure:
 
-- The ACP agent binary is installed and in your PATH (`amp-acp`, `claude-agent-acp`, `codex-acp`, `pi-acp`, or `copilot`)
+- The ACP agent binary is installed and in your PATH (`agy`, `amp-acp`, `claude-agent-acp`, `codex-acp`, `pi-acp`, or `copilot`)
 - The underlying CLI tool is authenticated and working
 - Subscription limits are not exceeded
 - Node.js and npm are installed (for npm-distributed adapters)

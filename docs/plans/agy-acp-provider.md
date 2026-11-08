@@ -1,6 +1,6 @@
 # Plan: `agy-acp` provider (Antigravity CLI over ACP)
 
-Status: **Phase 0 (probe) complete; design final; ready to implement Phase 1.**
+Status: **Phases 1–3 written (provider, tests, docs); Phase 4 verification in progress.**
 Branch: `claude/elegant-johnson-lwx4rh`. Last updated 2026-11-08.
 
 > Working doc for picking this back up after a break. Drop it from the branch (or
@@ -102,9 +102,10 @@ Raw transcript: run `docs/plans/agy_probe.py`. Summary:
 
 ## Open questions
 
-1. **`user_message_chunk` echo:** agy echoes the prompt back. Confirm goose ignores it rather than rendering it twice.
-2. **`resolve_mode` with two goose modes on `accept-edits`:** confirm in the unit test.
-3. **ToS:** `agy acp` is Google's documented way for third-party editors to connect; mention it in the upstream issue.
+All resolved:
+- `user_message_chunk` echo: falls through `_ => {}` in `provider.rs`, so it is ignored (no double render).
+- Two goose modes on `accept-edits`: `resolve_mode` keeps the current goose mode when it's among the candidates.
+- ToS: `agy acp` is Google's documented way for third-party editors to connect; mention it in the upstream issue.
 
 ## Roadmap / TODO
 
@@ -114,20 +115,20 @@ Raw transcript: run `docs/plans/agy_probe.py`. Summary:
 - [x] MCP + prompt probe: stdio works; HTTP needs `--process-per-session`.
 
 ### Phase 1 — Provider
-- [ ] `crates/goose/src/providers/agy_acp.rs` (consts `AGY_ACP_PROVIDER_NAME`, `AGY_ACP_BINARY`, metadata, `create()`, mode mapping).
-- [ ] `pub mod agy_acp;` in `providers/mod.rs`.
-- [ ] `agy_acp_inventory()` in `inventory/registrations.rs`.
-- [ ] Register in `providers/init.rs` (alphabetical, after `AmpAcpProvider`).
+- [x] `crates/goose/src/providers/agy_acp.rs` (consts `AGY_ACP_PROVIDER_NAME`, `AGY_ACP_BINARY`, metadata, `create()`, mode mapping).
+- [x] `pub mod agy_acp;` in `providers/mod.rs`.
+- [x] `agy_acp_inventory()` in `inventory/registrations.rs`.
+- [x] Register in `providers/init.rs` (alphabetical, after `AmpAcpProvider`).
 
 ### Phase 2 — Tests
-- [ ] Unit test: mode mapping round-trips (incl. the two-to-one `accept-edits` case).
-- [ ] `test_agy_acp_provider` in `tests/providers.rs` (`// Requires: agy installed + agy acp --login`):
+- [x] Unit tests in `agy_acp.rs`: mode mapping, launch args, model option (`resolve_mode` itself is already covered in `provider.rs`).
+- [x] `test_agy_acp_provider` in `tests/providers.rs` (`// Requires: agy installed + agy acp --login`):
       `.model_switch_name("gemini-3.8-flash")`, `.test_thinking_effort(true)`, `.test_mcp_tools(true)`.
-- [ ] Skip adding to `acp_custom_provider_methods_test.rs` while `show_only_when_installed` (CI has no `agy`).
+- [x] Skip adding to `acp_custom_provider_methods_test.rs` while `show_only_when_installed` (CI has no `agy`).
 
 ### Phase 3 — Docs
-- [ ] `documentation/docs/guides/acp-providers.md`: Available / Setup / Configuration sections; add `agy` to the Error Handling binary list.
-- [ ] Troubleshooting: logs at `~/.gemini/antigravity-cli/log/acp-*.log`; API key / ADC env vars (`GEMINI_API_KEY`, `AGY_ADC_AUTH`).
+- [x] `documentation/docs/guides/acp-providers.md`: Available / Setup / Configuration sections; add `agy` to the Error Handling binary list.
+- [x] Troubleshooting: logs at `~/.gemini/antigravity-cli/log/acp-*.log`; API key / ADC env vars (`GEMINI_API_KEY`, `AGY_ADC_AUTH`).
 
 ### Phase 4 — Verify and land
 - [ ] `cargo fmt`, `cargo clippy --all-targets -- -D warnings`, `GOOSE_DISABLE_KEYRING=1 cargo test -p goose`.

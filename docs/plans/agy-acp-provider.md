@@ -1,6 +1,6 @@
 # Plan: `agy-acp` provider (Antigravity CLI over ACP)
 
-Status: **Phases 1–3 done. First Mac run failed on MCP tool names (fixed, see Probe results); next: re-test the new macOS build (Phase 4).**
+Status: **Working end-to-end on Intel macOS 15 (Auto mode, stdio MCP). Next: rest of the Phase 4 manual checklist.**
 Branch: `claude/elegant-johnson-lwx4rh`. Last updated 2026-11-08.
 
 > Working doc for picking this back up after a break. Drop it from the branch (or
@@ -145,9 +145,12 @@ All resolved:
       (live e2e against the container's own `claude` CLI), one flaky ACP retry test.
       Tip: in a small container use `CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0` or integration tests run out of disk.
 - [x] First Mac run (2026-11-08): every turn failed; root cause MCP server name with a space → fixed by sanitizing names.
-- [ ] Re-test on Mac with the new build (same extensions, incl. "Chrome DevTools").
+- [x] Re-test on Mac with build `c9146d6` (2026-11-08): Auto mode, `gemini-3.8-flash`; plain Q&A works, Chrome DevTools
+      MCP tools listed as `mcp_Chrome_DevTools_*` and called successfully (list_pages → navigate_page → take_snapshot).
+      Note: goose's builtin/platform extensions (developer, memory, todo, …) are not passed to agy, so the model only
+      sees agy's own tools plus stdio/HTTP extensions. Expected for ACP providers; mention in docs if users ask.
 - [ ] Run workspace-wide `cargo clippy --all-targets -- -D warnings` (only `-p goose` done) and `test_agy_acp_provider` on a machine with `agy`.
-- [ ] Manual: `GOOSE_PROVIDER=agy-acp goose session` in each goose mode; model switch; thinking switch; one MCP extension.
+- [ ] Manual: remaining goose modes (SmartApprove, Approve — confirm permission prompts render; Chat → `plan`); model switch; thinking switch. (Auto + MCP done.)
 - [ ] Desktop: provider shows in setup catalog when `agy` is installed; model and thinking pickers work.
 - [ ] Manual test on Intel macOS 15 using the CLI artifact from `.github/workflows/agy-test-build.yml` (temporary; runs on every push to this branch).
 - [ ] Before an upstream PR: delete `.github/workflows/agy-test-build.yml`, `docs/plans/` (move notes into the issue).

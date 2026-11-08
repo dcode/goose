@@ -1,6 +1,6 @@
 # Plan: `agy-acp` provider (Antigravity CLI over ACP)
 
-Status: **Phases 1–3 written (provider, tests, docs); Phase 4 verification in progress.**
+Status: **Phases 1–3 done and verified in CI-less container; next: manual test on Intel macOS 15 (Phase 4).**
 Branch: `claude/elegant-johnson-lwx4rh`. Last updated 2026-11-08.
 
 > Working doc for picking this back up after a break. Drop it from the branch (or
@@ -131,7 +131,13 @@ All resolved:
 - [x] Troubleshooting: logs at `~/.gemini/antigravity-cli/log/acp-*.log`; API key / ADC env vars (`GEMINI_API_KEY`, `AGY_ADC_AUTH`).
 
 ### Phase 4 — Verify and land
-- [ ] `cargo fmt`, `cargo clippy --all-targets -- -D warnings`, `GOOSE_DISABLE_KEYRING=1 cargo test -p goose`.
+- [x] `cargo fmt`; `cargo clippy -p goose --all-targets -- -D warnings` clean.
+- [x] `cargo test -p goose` (2026-11-08, cloud container): agy unit tests 7/7; catalog test passes; `test_agy_acp_provider` skips (no `agy`).
+      Unrelated failures, all reproduced on base `5bad61a` or environment-caused: 2 read-only-dir tests (container runs as root),
+      `gcpauth` race test (container proxy), `test_app_tool_call_applies_extension_mutation`, `test_claude_code_provider`
+      (live e2e against the container's own `claude` CLI), one flaky ACP retry test.
+      Tip: in a small container use `CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0` or integration tests run out of disk.
+- [ ] Run workspace-wide `cargo clippy --all-targets -- -D warnings` (only `-p goose` done) and `test_agy_acp_provider` on a machine with `agy`.
 - [ ] Manual: `GOOSE_PROVIDER=agy-acp goose session` in each goose mode; model switch; thinking switch; one MCP extension.
 - [ ] Desktop: provider shows in setup catalog when `agy` is installed; model and thinking pickers work.
 - [ ] Manual test on Intel macOS 15 using the CLI artifact from `.github/workflows/agy-test-build.yml` (temporary; runs on every push to this branch).

@@ -2,8 +2,8 @@
 """Probe `agy acp` over one stdio connection and dump what goose needs to know.
 
 Usage:
-    python3 docs/plans/agy_probe.py [--agy PATH] [--mcp-cmd "npx -y @modelcontextprotocol/server-everything"]
-        [--prompt] [--out docs/plans/agy-acp-probe.json]
+    python3 docs/plans/agy_probe.py [--agy PATH] [--agy-arg=--process-per-session]
+        [--mcp-cmd "npx -y @modelcontextprotocol/server-everything"] [--prompt] [--out docs/plans/agy-acp-probe.json]
 
 Steps: initialize -> session/new (no auth call) -> on -32000, authenticate(oauth-personal) and retry
 -> optionally session/new with a stdio MCP server -> optionally a one-line prompt.
@@ -91,13 +91,14 @@ async def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--agy", default="agy")
     ap.add_argument("--mcp-cmd", help="stdio MCP server command to pass in session/new")
-    ap.add_argument("--prompt", action="store_true", help="send a short prompt to the first session")
+    ap.add_argument("--prompt", action="store_true", help="send a short prompt (to the MCP session if --mcp-cmd)")
+    ap.add_argument("--agy-arg", action="append", default=[], help="extra arg after `acp`, e.g. --process-per-session")
     ap.add_argument("--out", default=str(Path(__file__).with_name("agy-acp-probe.json")))
     args = ap.parse_args()
 
     log: list[Json] = []
     proc = await asyncio.create_subprocess_exec(
-        args.agy, "acp", stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE
+        args.agy, "acp", *args.agy_arg, stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE
     )
     conn = AcpConn(proc, log)
     cwd = os.getcwd()
@@ -118,18 +119,22 @@ async def main() -> None:
             new = await conn.request("session/new", {"cwd": cwd, "mcpServers": []})
         summarize_session("session/new (no MCP)", new)
 
+        prompt_session = new
         if args.mcp_cmd and "result" in new:
             cmd, *cmd_args = shlex.split(args.mcp_cmd)
             mcp = await conn.request("session/new", {"cwd": cwd, "mcpServers": [
                 {"name": "probe", "command": cmd, "args": cmd_args, "env": []}
             ]}, timeout=120)
             summarize_session("session/new (stdio MCP)", mcp)
+            prompt_session = mcp
 
-        if args.prompt and "result" in new:
-            sid = new["result"]["sessionId"]
+        if args.prompt and "result" in prompt_session:
+            sid = prompt_session["result"]["sessionId"]
+            print(f"\nprompting session {sid}")
             resp = await conn.request("session/prompt", {
                 "sessionId": sid,
-                "prompt": [{"type": "text", "text": "Reply with exactly: pong. Then list the names of the MCP tools you have, if any."}],
+                "prompt": [{"type": "text", "text": "Reply with exactly: pong. Then list every tool name you have whose server is named 'probe' "
+                         "(e.g. echo, get-sum). Do not call any tools."}],
             }, timeout=180)
             print("\nprompt stopReason:", resp.get("result", resp.get("error")))
 

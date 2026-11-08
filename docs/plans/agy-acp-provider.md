@@ -55,6 +55,14 @@ Raw transcript: run `docs/plans/agy_probe.py`. Summary:
   - `id: "mode"`, category `mode`: same values as the modes above.
 - **Legacy `models`** (`session/set_model`): model × effort combos, e.g. `gemini-4-argon-high`. Ignore; use the config options.
 - **`_meta.antigravity.tier`** on `session/new`: `{name: "Google AI Pro", id: "g1-pro-tier", upgradeUri}`. The model list likely varies by tier.
+- **`session/new` with a stdio `mcpServers` entry is accepted** (no error). Whether its tools reach the model is untested:
+  the 2nd probe prompted the *non-MCP* session by mistake (probe bug, fixed).
+- **`session/prompt` result includes `usage`** (`inputTokens`, `outputTokens`, `cachedReadTokens`, `cachedWriteTokens`,
+  `thoughtTokens`, `totalTokens`). Check goose maps it into its token accounting.
+- Extra notifications goose must tolerate: `available_commands_update` (~70 slash commands/skills: `/goal`, `/compact`,
+  `/plan`, plus bundled skills), `session_info_update` (`title`), `user_message_chunk` (prompt echo — make sure goose
+  doesn't render it twice).
+- Bare system prompt costs ~12.5k input tokens per turn (agy's own instructions + skills list). Worth noting in docs.
 - `agy acp --help` flags of interest: `--dangerously-skip-permissions`, `--sandbox`, `--agent`, `--add-dir`,
   `--process-per-session`, `--log-file`, `--disable-telemetry`, `--app-data-dir` / `--gemini-dir` / `--cli_dir_name`,
   `--include-default-customizations` (default true).
@@ -90,10 +98,12 @@ Raw transcript: run `docs/plans/agy_probe.py`. Summary:
 
 1. **MCP passthrough.** Does agy honor stdio `mcpServers` in `session/new`? Does it need `--process-per-session` for HTTP ones
    (goose maps `StreamableHttp` extensions to `McpServer::Http`)?
-   Run: `python3 docs/plans/agy_probe.py --mcp-cmd "npx -y @modelcontextprotocol/server-everything" --prompt`
-   (the last probe run used neither flag). Outcome decides `--process-per-session` and `.test_mcp_tools(...)`.
-2. **`resolve_mode` with two goose modes on `accept-edits`.** Confirm while writing the unit test.
-3. **ToS.** `agy acp` is Google's documented surface for third-party editors; mention it in the upstream issue.
+   Run both (second only if the first shows no `probe` tools):
+   `python3 docs/plans/agy_probe.py --mcp-cmd "npx -y @modelcontextprotocol/server-everything" --prompt`
+   `python3 docs/plans/agy_probe.py --agy-arg=--process-per-session --mcp-cmd "npx -y @modelcontextprotocol/server-everything" --prompt` Outcome decides `--process-per-session` and `.test_mcp_tools(...)`.
+2. **`user_message_chunk` echo / `usage` mapping** — check `provider.rs` handling while implementing.
+3. **`resolve_mode` with two goose modes on `accept-edits`.** Confirm while writing the unit test.
+4. **ToS.** `agy acp` is Google's documented surface for third-party editors; mention it in the upstream issue.
 
 ## Roadmap / TODO
 

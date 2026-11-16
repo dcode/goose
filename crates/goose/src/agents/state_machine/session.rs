@@ -12,14 +12,18 @@ use goose_agent::operation::{ConversationEffect, Emitter, MachineEffect};
 
 use super::ops_auto_effort::current_turn_effort;
 
-fn contains_tool_confirmation_request(message: &Message) -> bool {
-    message.content.iter().any(|content| {
-        matches!(
-            content,
-            MessageContent::ActionRequired(action)
-                if matches!(&action.data, ActionRequiredData::ToolConfirmation { .. })
-        )
-    })
+/// Confirmation requests an operation creates reach clients only through here. One a
+/// provider streamed was already emitted by the inference operation, and emitting it
+/// again would ask the user to answer a request the provider has already resolved.
+fn is_unpublished_tool_confirmation_request(message: &Message) -> bool {
+    message.metadata.inference.is_none()
+        && message.content.iter().any(|content| {
+            matches!(
+                content,
+                MessageContent::ActionRequired(action)
+                    if matches!(&action.data, ActionRequiredData::ToolConfirmation { .. })
+            )
+        })
 }
 impl MachineSession for Session {
     fn id(&self) -> &str {
@@ -142,7 +146,7 @@ impl EffectHandler<Session, GooseEffect> for SessionManager {
         for (index, effect) in effects.iter().enumerate() {
             match effect {
                 GooseEffect::Conversation(ConversationEffect::AppendMessage(message)) => {
-                    if contains_tool_confirmation_request(message) {
+                    if is_unpublished_tool_confirmation_request(message) {
                         // Responses can arrive immediately, so publish only after the persistence pass.
                         emit.emit(AgentEvent::Message(message.clone()));
                     }

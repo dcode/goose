@@ -1927,6 +1927,118 @@ mod tests {
         }
     }
 
+    /// Streams the way an ACP agent does: it asks for permission mid-stream and only
+    /// continues once the answer is routed back to it.
+    struct LivePermissionProvider {
+        pending: tokio::sync::Mutex<Option<tokio::sync::oneshot::Sender<()>>>,
+    }
+
+    #[async_trait::async_trait]
+    impl crate::providers::base::Provider for LivePermissionProvider {
+        fn get_name(&self) -> &str {
+            "test-live-permission"
+        }
+        async fn stream(
+            &self,
+            _: &goose_providers::model::ModelConfig,
+            _: &str,
+            _: &[Message],
+            _: &[Tool],
+        ) -> Result<MessageStream, ProviderError> {
+            use crate::conversation::message::TOOL_META_EXTERNAL_DISPATCH_KEY;
+
+            let (answer_tx, answer_rx) = tokio::sync::oneshot::channel();
+            *self.pending.lock().await = Some(answer_tx);
+            let request = Message::assistant().with_tool_request_with_metadata(
+                "tool-call",
+                Ok(rmcp::model::CallToolRequestParams::new("write_file")),
+                None,
+                Some(serde_json::json!({ TOOL_META_EXTERNAL_DISPATCH_KEY: true })),
+            );
+            let permission_request = Message::assistant()
+                .with_action_required(
+                    "tool-call",
+                    "write_file".to_string(),
+                    Default::default(),
+                    None,
+                )
+                .user_only();
+            Ok(Box::pin(async_stream::try_stream! {
+                yield (Some(request), None);
+                yield (Some(permission_request), None);
+                answer_rx.await.map_err(|_| {
+                    ProviderError::RequestFailed("permission request was dropped".to_string())
+                })?;
+                let result = rmcp::model::CallToolResult::success(vec![
+                    rmcp::model::ContentBlock::text("written"),
+                ]);
+                yield (Some(Message::user().with_tool_response("tool-call", Ok(result))), None);
+                yield (
+                    Some(Message::assistant().with_text("done")),
+                    Some(ProviderUsage::new("mock-model".to_string(), Usage::default())),
+                );
+            }))
+        }
+        fn permission_routing(&self) -> PermissionRouting {
+            PermissionRouting::ActionRequired
+        }
+        async fn handle_permission_confirmation(
+            &self,
+            request_id: &str,
+            _: &PermissionConfirmation,
+        ) -> bool {
+            if request_id != "tool-call" {
+                return false;
+            }
+            match self.pending.lock().await.take() {
+                Some(answer_tx) => answer_tx.send(()).is_ok(),
+                None => false,
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn provider_permission_request_is_emitted_once() -> Result<()> {
+        let temp_dir = tempfile::tempdir()?;
+        let provider = Arc::new(LivePermissionProvider {
+            pending: Default::default(),
+        });
+        let (services, session_id) = create_test_agent(
+            temp_dir.path().join("data"),
+            crate::hooks::HookManager::from_plugins_for_test(vec![]),
+            provider,
+            None,
+        )
+        .await?;
+        let session_config = SessionConfig {
+            id: session_id.clone(),
+            schedule_id: None,
+            max_turns: Some(10),
+        };
+
+        let reply_stream = services
+            .reply(Message::user().with_text("write it"), session_config, None)
+            .await?;
+        tokio::pin!(reply_stream);
+        let mut permission_requests = 0;
+        while let Some(event) = reply_stream.next().await {
+            let event = event?;
+            for request_id in services.tool_confirmation_request_ids(&event) {
+                permission_requests += 1;
+                services
+                    .submit_tool_confirmation(
+                        &session_id,
+                        &request_id,
+                        crate::permission::Permission::AllowOnce,
+                    )
+                    .await?;
+            }
+        }
+
+        assert_eq!(permission_requests, 1);
+        Ok(())
+    }
+
     #[tokio::test]
     async fn test_submit_tool_confirmation_routes_to_provider() {
         let (services, session, _data_dir) = tracing_test_agent_and_session().await;

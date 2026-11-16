@@ -4,6 +4,7 @@ use super::{
 };
 use crate::config::{self, Config};
 use crate::providers::acp_tooling::{acp_adapter_installed, resolved_acp_command};
+use crate::providers::agy_acp::{AGY_ACP_BINARY, AGY_ACP_PROVIDER_NAME};
 use crate::providers::amp_acp::{AMP_ACP_BINARY, AMP_ACP_PROVIDER_NAME};
 use crate::providers::base::ProviderDescriptor;
 use crate::providers::chatgpt_codex::TokenCache as ChatGptCodexTokenCache;
@@ -242,6 +243,10 @@ pub fn acp_inventory(
             .with_public("command", resolved_command.display().to_string()))
     })
     .with_configured(move || acp_adapter_installed(command))
+}
+
+pub fn agy_acp_inventory() -> InventoryRegistration {
+    acp_inventory(AGY_ACP_PROVIDER_NAME, AGY_ACP_BINARY, true)
 }
 
 pub fn amp_acp_inventory() -> InventoryRegistration {

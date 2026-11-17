@@ -8,6 +8,7 @@ use crate::acp::{
     configured_model_for_provider, extension_configs_to_mcp_servers, AcpProvider,
     AcpProviderConfig, ACP_CURRENT_MODEL,
 };
+use crate::config::extensions::name_to_key;
 use crate::config::search_path::SearchPaths;
 use crate::config::{Config, GooseMode};
 use crate::providers::base::{
@@ -79,17 +80,10 @@ fn session_config_options(model: String) -> Vec<(String, String)> {
 
 /// agy names MCP tools `mcp_<server>_<tool>` and requires `^[a-zA-Z0-9_-]{1,64}$`, yet still
 /// forwards invalid names to the model, whose API then rejects every turn with a 400.
-/// goose extension names like "Chrome DevTools" or "plugin:server" are common.
+/// The extension key fits that alphabet and is already unique within a session, since
+/// goose refuses two extensions whose names share a key.
 fn tool_safe_server_name(name: &str) -> String {
-    name.chars()
-        .map(|c| {
-            if c.is_ascii_alphanumeric() || c == '_' || c == '-' {
-                c
-            } else {
-                '_'
-            }
-        })
-        .collect()
+    name_to_key(name)
 }
 
 fn agy_mcp_servers(extensions: &[crate::config::ExtensionConfig]) -> Vec<McpServer> {
@@ -187,9 +181,10 @@ mod tests {
         assert_eq!(mode_mapping()[&goose_mode], vec![agy_mode.to_string()]);
     }
 
-    #[test_case("Chrome DevTools", "Chrome_DevTools")]
+    #[test_case("Chrome DevTools", "chromedevtools")]
+    #[test_case("Chrome_DevTools", "chrome_devtools")]
     #[test_case("rpi-ctags:ctags", "rpi-ctags_ctags")]
-    #[test_case("developer", "developer")]
+    #[test_case("Developer", "developer")]
     fn sanitizes_mcp_server_names_for_tool_names(name: &str, expected: &str) {
         assert_eq!(tool_safe_server_name(name), expected);
     }

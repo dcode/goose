@@ -281,7 +281,7 @@ Antigravity reports its available models dynamically, and the list depends on yo
 
 | goose mode      | Antigravity mode | Behavior                                                         |
 |-----------------|------------------|------------------------------------------------------------------|
-| `auto`          | `accept-edits`   | Edits are accepted by Antigravity; goose approves other requests |
+| `auto`          | `auto`           | Antigravity runs edits and safe commands; goose approves the rest |
 | `smart-approve` | `accept-edits`   | Auto-accepts file edits, prompts for commands                    |
 | `approve`       | `default`        | Prompts before edits and commands                                |
 | `chat`          | `plan`           | Plans before executing                                           |

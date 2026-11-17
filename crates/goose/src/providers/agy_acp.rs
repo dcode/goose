@@ -22,6 +22,7 @@ pub(crate) const AGY_ACP_BINARY: &str = "agy";
 const MODEL_CONFIG_OPTION_ID: &str = "model";
 const MODE_DEFAULT: &str = "default";
 const MODE_ACCEPT_EDITS: &str = "accept-edits";
+const MODE_AUTO: &str = "auto";
 const MODE_PLAN: &str = "plan";
 
 pub struct AgyAcpProvider;
@@ -50,11 +51,12 @@ impl goose_providers::base::ProviderDescriptor for AgyAcpProvider {
     }
 }
 
-/// agy has no permission-bypass mode, so Auto shares `accept-edits` with SmartApprove;
-/// goose auto-allows the remaining permission requests itself while in Auto.
+/// agy's `auto` mode still prompts on irreversible actions; goose answers those itself in
+/// Auto. `--dangerously-skip-permissions` is avoided because it is fixed at launch and would
+/// outlive a mid-session switch to a stricter goose mode.
 fn mode_mapping() -> HashMap<GooseMode, Vec<String>> {
     HashMap::from([
-        (GooseMode::Auto, vec![MODE_ACCEPT_EDITS.to_string()]),
+        (GooseMode::Auto, vec![MODE_AUTO.to_string()]),
         (GooseMode::SmartApprove, vec![MODE_ACCEPT_EDITS.to_string()]),
         (GooseMode::Approve, vec![MODE_DEFAULT.to_string()]),
         (GooseMode::Chat, vec![MODE_PLAN.to_string()]),
@@ -177,7 +179,7 @@ mod tests {
     use super::*;
     use test_case::test_case;
 
-    #[test_case(GooseMode::Auto, MODE_ACCEPT_EDITS)]
+    #[test_case(GooseMode::Auto, MODE_AUTO)]
     #[test_case(GooseMode::SmartApprove, MODE_ACCEPT_EDITS)]
     #[test_case(GooseMode::Approve, MODE_DEFAULT)]
     #[test_case(GooseMode::Chat, MODE_PLAN)]
